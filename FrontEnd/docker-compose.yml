@@ -1,0 +1,68 @@
+version: '3.4'
+
+services:
+
+  envoygateway:
+    build:
+      context: .
+      dockerfile: Envoy/Dockerfile
+    ports:
+      - "9901:9901"
+      - "10000:10000"
+     # - "10001:10001"
+    volumes:
+      - ./Envoy/envoy.yaml:/etc/envoy/envoy.yaml
+      #- ./Envoy/https.crt:/etc/ssl/certs/https.crt
+      #- ./Envoy/key.pem:/etc/ssl/certs/key.pem
+
+  envoygateway-dapr:
+    image: "daprio/daprd:latest"
+    command: [ "./daprd", "-app-id", "envoygateway", "-app-port", "10000" ] 
+    #depends_on:
+    #  - frontend
+    network_mode: "service:envoygateway"
+
+  frontend:
+    image: ${DOCKER_REGISTRY-}frontend
+    build:
+      context: .
+      dockerfile: FrontEnd/Dockerfile
+    ports:
+      - "51000:50001"
+      - "8089:80"
+    environment:
+      #ASPNETCORE_URLS: "https://+;http://+"
+      #ASPNETCORE_HTTPS_PORT: "8081"
+      ASPNETCORE_ENVIRONMENT: "Development"
+    volumes:
+    - /host-folder-path:/container-folder-path
+    
+  frontend-dapr:
+    image: "daprio/daprd:latest"
+    command: [ "./daprd", "-app-id", "frontend", "-app-port", "80" ] 
+    depends_on:
+      - frontend
+    network_mode: "service:frontend"
+
+  apibackend:
+    image: ${DOCKER_REGISTRY-}apibackend
+    build:
+      context: .
+      dockerfile: ApiBackend/Dockerfile
+    depends_on:
+      - frontend
+    ports:
+      - "52000:50001"
+      - "9000:80"
+    environment:
+      #ASPNETCORE_URLS: "https://+;http://+"
+      #ASPNETCORE_HTTPS_PORT: "8081"
+      ASPNETCORE_ENVIRONMENT: "Development"
+
+  apibackend-dapr:
+    image: "daprio/daprd:latest"
+    command: [ "./daprd", "-app-id", "apibackend", "-app-port", "80" ] 
+    depends_on:
+      - frontend
+    network_mode: "service:apibackend"
+
